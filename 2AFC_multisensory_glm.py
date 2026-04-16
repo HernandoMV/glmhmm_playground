@@ -210,31 +210,37 @@ def _(SoftmaxGLMHMM, inputs_colnames):
 
 
 @app.cell
-def _():
+def _(df_sel):
     # fit each session separately
-    # session_ids = df_sel['session'].values[1:] # get the session ids, also delete the first one to match the inputs and y
-    return
+    session_ids = df_sel['session'].values[1:] # get the session ids, also delete the first one to match the inputs and y
+    return (session_ids,)
 
 
 @app.cell
-def _(inputs, model, params, props, y):
-    fitted_params, log_probs = model.fit_em(
+def _(inputs, model, params, props, session_ids, y):
+    fitted_params, log_probs = model.fit_em_multisession(
         params,
         props,
         y,
         inputs,
-        # session_ids=session_ids,
-        num_iters=50,
+        session_ids=session_ids,
+        num_iters=100,
         verbose=True,
     )
     return (fitted_params,)
 
 
 @app.cell
-def _(fitted_params, inputs, model, y):
-    states = model.predict_state_probs(fitted_params, y, inputs)
+def _(fitted_params):
+    fitted_params
+    return
+
+
+@app.cell
+def _(fitted_params, inputs, model, session_ids, y):
+    smoothed_probs = model.smoother_multisession(fitted_params, y, inputs, session_ids)
     # get only one column
-    state_one = states[:,0]
+    state_one = smoothed_probs[:,0]
     return (state_one,)
 
 
@@ -242,7 +248,7 @@ def _(fitted_params, inputs, model, y):
 def _(df_sel, np, pd, plt, sns, state_one):
     # Performance and state-1 probability in one plot
     performance_trace = pd.Series(df_sel["correct"].astype(float).values[1:])
-    rolled_performance = performance_trace.rolling(window=25).mean()
+    rolled_performance = performance_trace.rolling(window=50).mean()
     state_one_np = np.asarray(state_one)
 
     n = min(len(rolled_performance), len(state_one_np))
